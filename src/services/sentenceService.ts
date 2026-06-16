@@ -77,7 +77,7 @@ export const deleteSentence = async (id: string): Promise<boolean> => {
 }
 
 export const batchCreateSentences = async (rows: SentenceFormData[]): Promise<{ count: number; error?: string }> => {
-  const { error, count } = await supabase.from('Sentence').insert(
+  const { error } = await supabase.from('Sentence').insert(
     rows.map(r => ({ id: crypto.randomUUID(), ...r }))
   )
 

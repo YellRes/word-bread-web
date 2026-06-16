@@ -11,6 +11,8 @@ node_modules
 dist
 dist-ssr
 *.local
+# 例外：前端公开 key，提交进 git 以便多台电脑同步（切勿放真正的机密！）
+!.env.local
 
 # Editor directories and files
 .vscode/*

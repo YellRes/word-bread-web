@@ -1,18 +1,42 @@
 import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
 import {
-  Button,
-  Form,
-  Input,
-  Modal,
-  Popconfirm,
-  Space,
+  BookOpen,
+  Plus,
+  Upload,
+  ChevronRight,
+  ChevronDown,
+} from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
+import {
   Table,
-  Tag,
-  Typography,
-  message,
-} from 'antd'
-import { PlusOutlined, UploadOutlined } from '@ant-design/icons'
-import type { ColumnsType } from 'antd/es/table'
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Skeleton } from '@/components/ui/skeleton'
 import SentenceModal from './components/SentenceModal'
 import BatchUploadModal from './components/BatchUploadModal'
 import { createArticle, deleteArticle, fetchArticles } from './services/articleService'
@@ -25,17 +49,19 @@ import {
 } from './services/sentenceService'
 import type { DBArticle, DBSentence, SentenceFormData } from './types/index'
 
-const { Title } = Typography
-
 function renderContent(text: string) {
+  // 把 (单词) 渲染成品牌琥珀高亮，其余原样
   const parts = text.split(/(\([^)]+\))/g)
   return (
     <span>
       {parts.map((part, i) =>
         /^\([^)]+\)$/.test(part) ? (
-          <Tag color="orange" key={i} style={{ margin: '0 2px' }}>
+          <span
+            key={i}
+            className="rounded-md bg-amber-100 px-1.5 py-0.5 text-[0.92em] font-semibold text-amber-800"
+          >
             {part.slice(1, -1)}
-          </Tag>
+          </span>
         ) : (
           <span key={i}>{part}</span>
         )
@@ -63,7 +89,8 @@ export default function App() {
 
   // article modal
   const [articleModalOpen, setArticleModalOpen] = useState(false)
-  const [articleForm] = Form.useForm<{ title: string }>()
+  const [articleTitle, setArticleTitle] = useState('')
+  const [articleTitleError, setArticleTitleError] = useState('')
 
   const loadArticles = async () => {
     setArticlesLoading(true)
@@ -100,7 +127,7 @@ export default function App() {
       ok = await createSentence(data)
     }
     if (ok) {
-      message.success(editing ? '更新成功' : '创建成功')
+      toast.success(editing ? '更新成功' : '创建成功')
       refreshArticleSentences(data.articleId)
       if (keepOpen) {
         setNextArticleId(data.articleId)
@@ -111,125 +138,252 @@ export default function App() {
         setNextArticleId(undefined)
       }
     } else {
-      message.error('操作失败，请重试')
+      toast.error('操作失败，请重试')
     }
   }
 
   const handleDeleteSentence = async (sentence: DBSentence) => {
     const ok = await deleteSentence(sentence.id)
     if (ok) {
-      message.success('删除成功')
+      toast.success('删除成功')
       refreshArticleSentences(sentence.articleId)
     } else {
-      message.error('删除失败')
+      toast.error('删除失败')
     }
   }
 
-  const sentenceColumns: ColumnsType<DBSentence> = [
-    {
-      title: '句子内容',
-      dataIndex: 'content',
-      key: 'content',
-      render: (text: string) => renderContent(text),
-    },
-    {
-      title: '中文翻译',
-      dataIndex: 'translate',
-      key: 'translate',
-      ellipsis: true,
-      width: 220,
-    },
-    {
-      title: '操作',
-      key: 'action',
-      width: 100,
-      render: (_, record) => (
-        <Space>
-          <Button type="link" size="small" onClick={() => { setEditing(record); setNextArticleId(record.articleId); setModalOpen(true) }}>
-            编辑
-          </Button>
-          <Popconfirm title="确认删除？" onConfirm={() => handleDeleteSentence(record)} okText="删除" cancelText="取消">
-            <Button type="link" size="small" danger>删除</Button>
-          </Popconfirm>
-        </Space>
-      ),
-    },
-  ]
+  const handleDeleteArticle = async (record: DBArticle) => {
+    const ok = await deleteArticle(record.id)
+    if (ok) { toast.success('删除成功'); loadArticles() }
+    else toast.error('删除失败')
+  }
 
-  const articleColumns: ColumnsType<DBArticle> = [
-    {
-      title: '文章标题',
-      dataIndex: 'title',
-      key: 'title',
-    },
-    {
-      title: '操作',
-      key: 'action',
-      width: 260,
-      render: (_, record) => (
-        <Space>
-          <Button
-            type="link" size="small"
-            onClick={() => { setEditing(null); setNextArticleId(record.id); setModalKey(k => k + 1); setModalOpen(true) }}
-          >
-            新建句子
-          </Button>
-          <Button
-            type="link" size="small" icon={<UploadOutlined />}
-            onClick={() => { setBatchArticleId(record.id); setBatchOpen(true) }}
-          >
-            批量上传
-          </Button>
-          <Popconfirm title={`确认删除「${record.title}」？`} okText="删除" cancelText="取消" onConfirm={async () => {
-            const ok = await deleteArticle(record.id)
-            if (ok) { message.success('删除成功'); loadArticles() }
-            else message.error('删除失败')
-          }}>
-            <Button type="link" size="small" danger>删除</Button>
-          </Popconfirm>
-        </Space>
-      ),
-    },
-  ]
+  const handleCreateArticle = async () => {
+    if (!articleTitle.trim()) {
+      setArticleTitleError('请输入文章标题')
+      return
+    }
+    const ok = await createArticle(articleTitle.trim())
+    if (ok) {
+      toast.success('文章创建成功')
+      setArticleModalOpen(false)
+      loadArticles()
+    } else {
+      toast.error('创建失败，请重试')
+    }
+  }
+
+  const openArticleModal = () => {
+    setArticleTitle('')
+    setArticleTitleError('')
+    setArticleModalOpen(true)
+  }
+
+  const renderSentenceRows = (articleId: string) => {
+    if (loadingArticles.has(articleId)) {
+      return [0, 1].map(i => (
+        <TableRow key={`sent-skel-${i}`}>
+          <TableCell><Skeleton className="h-4 w-3/5" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-2/5" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-12" /></TableCell>
+        </TableRow>
+      ))
+    }
+    const sentences = sentencesByArticle[articleId] || []
+    if (sentences.length === 0) {
+      return (
+        <TableRow className="hover:bg-transparent">
+          <TableCell colSpan={3} className="py-8 text-center text-sm text-muted-foreground">
+            暂无句子，点击「新建句子」或「批量上传」添加
+          </TableCell>
+        </TableRow>
+      )
+    }
+    return sentences.map(sentence => (
+      <TableRow key={sentence.id}>
+        <TableCell className="whitespace-normal">{renderContent(sentence.content)}</TableCell>
+        <TableCell className="w-[220px] whitespace-normal text-muted-foreground">{sentence.translate}</TableCell>
+        <TableCell className="w-[100px]">
+          <div className="inline-flex gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => { setEditing(sentence); setNextArticleId(sentence.articleId); setModalOpen(true) }}
+            >
+              编辑
+            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" size="sm" className="text-destructive">删除</Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>确认删除？</AlertDialogTitle>
+                  <AlertDialogDescription>此操作不可撤销。</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>取消</AlertDialogCancel>
+                  <AlertDialogAction
+                    variant="destructive"
+                    onClick={() => handleDeleteSentence(sentence)}
+                  >
+                    删除
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </TableCell>
+      </TableRow>
+    ))
+  }
 
   return (
-    <div style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 16px' }}>
-      <Title level={3} style={{ marginBottom: 24 }}>句子管理</Title>
+    <div className="mx-auto max-w-[1100px] px-5 py-8">
+      {/* 品牌 header */}
+      <header className="mb-6 flex items-center gap-3">
+        <div className="grid size-11 place-items-center rounded-xl bg-primary text-primary-foreground">
+          <BookOpen className="size-6" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">WordBread</h1>
+          <p className="text-sm text-muted-foreground">
+            双语句子学习库 · 共 {articles.length} 篇文章
+          </p>
+        </div>
+      </header>
 
-      <Space style={{ marginBottom: 16 }} wrap>
-        <Button icon={<PlusOutlined />} onClick={() => { articleForm.resetFields(); setArticleModalOpen(true) }}>
+      {/* 工具栏 */}
+      <div className="mb-4 flex flex-wrap gap-2">
+        <Button variant="outline" onClick={openArticleModal}>
+          <Plus />
           新建文章
         </Button>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditing(null); setNextArticleId(undefined); setModalKey(k => k + 1); setModalOpen(true) }}>
+        <Button
+          onClick={() => { setEditing(null); setNextArticleId(undefined); setModalKey(k => k + 1); setModalOpen(true) }}
+        >
+          <Plus />
           新建句子
         </Button>
-        <Button icon={<UploadOutlined />} onClick={() => { setBatchArticleId(undefined); setBatchOpen(true) }}>
+        <Button variant="outline" onClick={() => { setBatchArticleId(undefined); setBatchOpen(true) }}>
+          <Upload />
           批量上传
         </Button>
-      </Space>
+      </div>
 
-      <Table
-        rowKey="id"
-        columns={articleColumns}
-        dataSource={articles}
-        loading={articlesLoading}
-        pagination={{ pageSize: 20, showTotal: total => `共 ${total} 篇文章` }}
-        expandable={{
-          expandedRowKeys,
-          onExpand: handleExpand,
-          expandedRowRender: (record) => (
-            <Table
-              size="small"
-              rowKey="id"
-              columns={sentenceColumns}
-              dataSource={sentencesByArticle[record.id] || []}
-              loading={loadingArticles.has(record.id)}
-              pagination={false}
-              style={{ margin: '0 8px' }}
-            />
-          ),
-        }}
-      />
+      {/* 文章表 */}
+      <div className="rounded-lg border bg-card">
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="w-10" aria-hidden />
+              <TableHead>文章标题</TableHead>
+              <TableHead className="w-[260px]">操作</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {articlesLoading ? (
+              [0, 1, 2].map(i => (
+                <TableRow key={`skel-${i}`} className="hover:bg-transparent">
+                  <TableCell />
+                  <TableCell><Skeleton className="h-4 w-2/5" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-3/5" /></TableCell>
+                </TableRow>
+              ))
+            ) : articles.length === 0 ? (
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={3} className="py-10 text-center text-sm text-muted-foreground">
+                  暂无文章，点击「新建文章」开始
+                </TableCell>
+              </TableRow>
+            ) : (
+              articles.map(record => {
+                const expanded = expandedRowKeys.includes(record.id)
+                return (
+                  <FragmentRow key={record.id}>
+                    <TableRow>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={expanded ? '收起' : '展开'}
+                          onClick={() => handleExpand(!expanded, record)}
+                        >
+                          {expanded ? <ChevronDown /> : <ChevronRight />}
+                        </Button>
+                      </TableCell>
+                      <TableCell className="font-medium">{record.title}</TableCell>
+                      <TableCell>
+                        <div className="inline-flex flex-wrap gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => { setEditing(null); setNextArticleId(record.id); setModalKey(k => k + 1); setModalOpen(true) }}
+                          >
+                            新建句子
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => { setBatchArticleId(record.id); setBatchOpen(true) }}
+                          >
+                            <Upload />
+                            批量上传
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="sm" className="text-destructive">删除</Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>确认删除「{record.title}」？</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  删除文章后，其下句子也将一并移除，此操作不可撤销。
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>取消</AlertDialogCancel>
+                                <AlertDialogAction
+                                  variant="destructive"
+                                  onClick={() => handleDeleteArticle(record)}
+                                >
+                                  删除
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                    {expanded && (
+                      <TableRow className="hover:bg-transparent">
+                        <TableCell colSpan={3} className="bg-muted/30 p-0">
+                          <div className="px-3 py-2">
+                            <div className="rounded-lg border bg-card">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow className="hover:bg-transparent">
+                                    <TableHead>句子内容</TableHead>
+                                    <TableHead className="w-[220px]">中文翻译</TableHead>
+                                    <TableHead className="w-[100px]">操作</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {renderSentenceRows(record.id)}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </FragmentRow>
+                )
+              })
+            )}
+          </TableBody>
+        </Table>
+      </div>
 
       <BatchUploadModal
         open={batchOpen}
@@ -238,9 +392,9 @@ export default function App() {
         onOk={async (rows) => {
           const { count, error } = await batchCreateSentences(rows)
           if (error) {
-            message.error(`上传失败：${error}`)
+            toast.error(`上传失败：${error}`)
           } else {
-            message.success(`成功上传 ${count} 条句子`)
+            toast.success(`成功上传 ${count} 条句子`)
             setBatchOpen(false)
             if (rows[0]?.articleId) refreshArticleSentences(rows[0].articleId)
           }
@@ -248,26 +402,32 @@ export default function App() {
         onCancel={() => setBatchOpen(false)}
       />
 
-      <Modal
-        title="新建文章"
-        open={articleModalOpen}
-        onCancel={() => setArticleModalOpen(false)}
-        onOk={async () => {
-          const { title } = await articleForm.validateFields()
-          const ok = await createArticle(title.trim())
-          if (ok) { message.success('文章创建成功'); setArticleModalOpen(false); loadArticles() }
-          else message.error('创建失败，请重试')
-        }}
-        okText="创建"
-        cancelText="取消"
-        destroyOnHidden
-      >
-        <Form form={articleForm} layout="vertical" style={{ marginTop: 16 }}>
-          <Form.Item name="title" label="文章标题" rules={[{ required: true, message: '请输入文章标题' }]}>
-            <Input placeholder="输入文章标题" />
-          </Form.Item>
-        </Form>
-      </Modal>
+      {/* 新建文章弹窗 */}
+      <Dialog open={articleModalOpen} onOpenChange={o => { if (!o) setArticleModalOpen(false) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>新建文章</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="article-title">
+              文章标题 <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="article-title"
+              placeholder="输入文章标题"
+              value={articleTitle}
+              aria-invalid={!!articleTitleError}
+              onChange={e => { setArticleTitle(e.target.value); if (articleTitleError) setArticleTitleError('') }}
+              onKeyDown={e => { if (e.key === 'Enter') handleCreateArticle() }}
+            />
+            {articleTitleError && <p className="text-sm text-destructive">{articleTitleError}</p>}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setArticleModalOpen(false)}>取消</Button>
+            <Button onClick={handleCreateArticle}>创建</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <SentenceModal
         key={modalKey}
@@ -280,4 +440,9 @@ export default function App() {
       />
     </div>
   )
+}
+
+// 让一个 article 行 + 其展开行作为一组（React.Fragment 透传 key）
+function FragmentRow({ children }: { children: React.ReactNode }) {
+  return <>{children}</>
 }
