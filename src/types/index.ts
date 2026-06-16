@@ -20,3 +20,15 @@ export interface SentenceFormData {
   articleId: string
   translate: string
 }
+
+export interface PracticeRecord {
+  id: string
+  sentenceId: string
+  articleId: string
+  isCorrect: boolean
+  totalBlanks: number
+  correctBlanks: number
+  revealed: boolean
+  userId?: string
+  createdAt?: string
+}
