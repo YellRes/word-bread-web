@@ -21,9 +21,11 @@ import {
 } from '@/components/ui/command'
 import { cn } from '@/lib/utils'
 import { parseContent, hasBlanks, normalizeAnswer, toPlainSentence } from '@/lib/annotation'
+import { speak } from '@/lib/speech'
 import { fetchArticles } from '../services/articleService'
 import { fetchSentences } from '../services/sentenceService'
 import { recordPractice } from '../services/practiceService'
+import { upsertReview } from '../services/reviewService'
 import type { DBArticle, DBSentence } from '../types/index'
 
 type Phase = 'select' | 'practicing' | 'summary'
@@ -31,11 +33,15 @@ type Phase = 'select' | 'practicing' | 'summary'
 interface Props {
   /** 由「练习」按钮指定的文章，提供时进入页面自动开练 */
   initialArticleId?: string
+  /** 指定句子集（如错题本重练）。提供时优先于 initialArticleId，直接练这批句子 */
+  customSentences?: DBSentence[]
+  /** 指定句子集时显示的标题（如「错题重练」） */
+  customTitle?: string
   /** 每次点击「练习」按钮递增，用于触发（重新）自动开练 */
   practiceNonce?: number
 }
 
-export default function PracticePage({ initialArticleId, practiceNonce }: Props) {
+export default function PracticePage({ initialArticleId, customSentences, customTitle, practiceNonce }: Props) {
   const [articles, setArticles] = useState<DBArticle[]>([])
   const [articleId, setArticleId] = useState<string>(initialArticleId ?? '')
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -51,6 +57,7 @@ export default function PracticePage({ initialArticleId, practiceNonce }: Props)
   const [blankResults, setBlankResults] = useState<boolean[]>([])
   const [wordShown, setWordShown] = useState<boolean[]>([])
   const [correctCount, setCorrectCount] = useState(0)
+  const [sessionTitle, setSessionTitle] = useState('')
 
   useEffect(() => { fetchArticles().then(setArticles) }, [])
 
@@ -75,6 +82,16 @@ export default function PracticePage({ initialArticleId, practiceNonce }: Props)
   }, [index, current?.id])
 
   const selectedArticle = articles.find(a => a.id === articleId)
+  // 标题：自定义会话用快照标题；按文章练习时回退到响应式的文章标题（应对 articles 后加载）
+  const headerTitle = sessionTitle || selectedArticle?.title || ''
+
+  const beginPractice = (list: DBSentence[], title: string) => {
+    setSentences(list)
+    setSessionTitle(title)
+    setIndex(0)
+    setCorrectCount(0)
+    setPhase('practicing')
+  }
 
   const startPractice = async (id: string = articleId) => {
     if (!id) return
@@ -87,15 +104,18 @@ export default function PracticePage({ initialArticleId, practiceNonce }: Props)
       toast.info('这篇文章没有可练习的标注词')
       return
     }
-    setSentences(practiceable)
-    setIndex(0)
-    setCorrectCount(0)
-    setPhase('practicing')
+    beginPractice(practiceable, articles.find(a => a.id === id)?.title ?? '')
   }
 
-  // 从「练习」按钮进入：每次 nonce 变化（含首次挂载）自动开练指定文章
+  // 从「练习」按钮进入：每次 nonce 变化（含首次挂载）自动开练。
+  // 优先用传入的句子集（错题本重练），否则按指定文章 fetch。
   useEffect(() => {
-    if (initialArticleId) startPractice(initialArticleId)
+    if (customSentences && customSentences.length > 0) {
+      setArticleId('')
+      beginPractice(customSentences, customTitle ?? '错题重练')
+    } else if (initialArticleId) {
+      startPractice(initialArticleId)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [practiceNonce])
 
@@ -111,6 +131,14 @@ export default function PracticePage({ initialArticleId, practiceNonce }: Props)
     }).then(ok => {
       if (!ok) toast.error('进度保存失败，但不影响继续练习')
     })
+    // 更新 SM-2 间隔重复状态（对抗遗忘）；失败仅记录日志，不打扰练习
+    upsertReview({
+      sentenceId: current.id,
+      articleId: current.articleId,
+      revealed: wasRevealed,
+      correctBlanks,
+      totalBlanks: blanks.length,
+    }).catch(e => console.error('upsertReview failed:', e))
   }
 
   const handleCheck = () => {
@@ -133,19 +161,6 @@ export default function PracticePage({ initialArticleId, practiceNonce }: Props)
     setRevealed(true)
     setChecked(true)
     persist(false, results.filter(Boolean).length, true)
-  }
-
-  const speakText = (text: string, rate = 0.95) => {
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-      toast.error('当前浏览器不支持语音播放')
-      return
-    }
-    if (!text) return
-    window.speechSynthesis.cancel() // 打断上一次，避免叠音
-    const u = new SpeechSynthesisUtterance(text)
-    u.lang = 'en-US'
-    u.rate = rate
-    window.speechSynthesis.speak(u)
   }
 
   const toggleWord = (k: number) =>
@@ -232,7 +247,7 @@ export default function PracticePage({ initialArticleId, practiceNonce }: Props)
         <Card>
           <CardHeader>
             <div className="text-lg font-semibold">练习完成 🎉</div>
-            <p className="text-sm text-muted-foreground">{selectedArticle?.title}</p>
+            <p className="text-sm text-muted-foreground">{headerTitle}</p>
           </CardHeader>
           <CardContent>
             <div className="rounded-lg border bg-muted/30 py-8 text-center">
@@ -268,7 +283,7 @@ export default function PracticePage({ initialArticleId, practiceNonce }: Props)
   return (
     <div className="mx-auto max-w-2xl">
       <div className="mb-2.5 flex items-center justify-between text-sm text-muted-foreground">
-        <span className="truncate pr-4">{selectedArticle?.title}</span>
+        <span className="truncate pr-4">{headerTitle}</span>
         <span className="shrink-0 tabular-nums">{index + 1} / {sentences.length}</span>
       </div>
       <Progress value={((index + (checked ? 1 : 0)) / sentences.length) * 100} className="mb-5 h-1.5" />
@@ -281,7 +296,7 @@ export default function PracticePage({ initialArticleId, practiceNonce }: Props)
               variant="ghost"
               size="icon-sm"
               className="text-muted-foreground hover:text-primary"
-              onClick={() => speakText(toPlainSentence(current.content))}
+              onClick={() => speak(toPlainSentence(current.content))}
               aria-label="播放整句读音"
               title="播放整句读音"
             >
@@ -335,7 +350,7 @@ export default function PracticePage({ initialArticleId, practiceNonce }: Props)
                       variant="ghost"
                       size="icon-sm"
                       className="size-7 shrink-0 text-muted-foreground hover:text-primary"
-                      onClick={() => speakText(b.answer)}
+                      onClick={() => speak(b.answer)}
                       aria-label="播放单词读音"
                       title="播放单词读音"
                     >

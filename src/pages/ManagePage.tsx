@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { Plus, Upload, ChevronRight, ChevronDown, ListChecks } from 'lucide-react'
+import { Plus, Upload, ChevronRight, ChevronDown, ListChecks, Pencil, Trash2, FilePlus2 } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -19,18 +19,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
+import { formatDate, formatMonth } from '@/lib/format'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import SentenceModal from '../components/SentenceModal'
 import BatchUploadModal from '../components/BatchUploadModal'
 import { createArticle, deleteArticle, fetchArticles } from '../services/articleService'
@@ -52,7 +47,7 @@ function renderContent(text: string) {
         /^\([^)]+\)$/.test(part) ? (
           <span
             key={i}
-            className="rounded-md bg-amber-100 px-1.5 py-0.5 text-[0.92em] font-semibold text-amber-800"
+            className="rounded-md bg-primary/10 px-1.5 py-0.5 text-[0.92em] font-semibold text-primary"
           >
             {part.slice(1, -1)}
           </span>
@@ -62,6 +57,23 @@ function renderContent(text: string) {
       )}
     </span>
   )
+}
+
+// 按「创建月份」把文章归组，保留传入顺序（fetchArticles 已按 createdAt 降序，故最新月在前）
+function groupByMonth(articles: DBArticle[]): { label: string; items: DBArticle[] }[] {
+  const groups: { label: string; items: DBArticle[] }[] = []
+  const index = new Map<string, number>()
+  for (const a of articles) {
+    const label = formatMonth(a.createdAt)
+    let i = index.get(label)
+    if (i === undefined) {
+      i = groups.length
+      index.set(label, i)
+      groups.push({ label, items: [] })
+    }
+    groups[i].items.push(a)
+  }
+  return groups
 }
 
 interface Props {
@@ -177,63 +189,86 @@ export default function ManagePage({ onPractice }: Props) {
     setArticleModalOpen(true)
   }
 
-  const renderSentenceRows = (articleId: string) => {
+  const renderSentenceList = (articleId: string) => {
     if (loadingArticles.has(articleId)) {
-      return [0, 1].map(i => (
-        <TableRow key={`sent-skel-${i}`}>
-          <TableCell><Skeleton className="h-4 w-3/5" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-2/5" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-12" /></TableCell>
-        </TableRow>
-      ))
+      return (
+        <div className="space-y-3">
+          {[0, 1].map(i => (
+            <div key={`sent-skel-${i}`} className="space-y-1.5">
+              <Skeleton className="h-4 w-3/5" />
+              <Skeleton className="h-3.5 w-2/5" />
+            </div>
+          ))}
+        </div>
+      )
     }
     const sentences = sentencesByArticle[articleId] || []
     if (sentences.length === 0) {
       return (
-        <TableRow className="hover:bg-transparent">
-          <TableCell colSpan={3} className="py-8 text-center text-sm text-muted-foreground">
-            暂无句子，点击「新建句子」或「批量上传」添加
-          </TableCell>
-        </TableRow>
+        <p className="py-6 text-center text-sm text-muted-foreground">
+          暂无句子，点击「新建句子」或「批量上传」添加
+        </p>
       )
     }
-    return sentences.map(sentence => (
-      <TableRow key={sentence.id}>
-        <TableCell className="whitespace-normal">{renderContent(sentence.content)}</TableCell>
-        <TableCell className="w-[220px] whitespace-normal text-muted-foreground">{sentence.translate}</TableCell>
-        <TableCell className="w-[100px]">
-          <div className="inline-flex gap-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => { setEditing(sentence); setNextArticleId(sentence.articleId); setModalOpen(true) }}
-            >
-              编辑
-            </Button>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="ghost" size="sm" className="text-destructive">删除</Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>确认删除？</AlertDialogTitle>
-                  <AlertDialogDescription>此操作不可撤销。</AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>取消</AlertDialogCancel>
-                  <AlertDialogAction
-                    variant="destructive"
-                    onClick={() => handleDeleteSentence(sentence)}
+    return (
+      <ul className="divide-y divide-border/60">
+        {sentences.map(sentence => (
+          <li key={sentence.id} className="flex items-start gap-3 py-2.5 first:pt-0 last:pb-0">
+            <div className="min-w-0 flex-1">
+              <p className="leading-relaxed">{renderContent(sentence.content)}</p>
+              {sentence.translate && (
+                <p className="mt-0.5 text-sm text-muted-foreground">{sentence.translate}</p>
+              )}
+            </div>
+            <span className="hidden shrink-0 pt-0.5 text-xs text-muted-foreground tabular-nums sm:block">
+              {formatDate(sentence.createdAt)}
+            </span>
+            <div className="inline-flex shrink-0 gap-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="编辑"
+                    onClick={() => { setEditing(sentence); setNextArticleId(sentence.articleId); setModalOpen(true) }}
                   >
-                    删除
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
-        </TableCell>
-      </TableRow>
-    ))
+                    <Pencil />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>编辑</TooltipContent>
+              </Tooltip>
+              <AlertDialog>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="icon-sm" className="text-destructive" aria-label="删除">
+                        <Trash2 />
+                      </Button>
+                    </AlertDialogTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent>删除</TooltipContent>
+                </Tooltip>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>确认删除？</AlertDialogTitle>
+                    <AlertDialogDescription>此操作不可撤销。</AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>取消</AlertDialogCancel>
+                    <AlertDialogAction
+                      variant="destructive"
+                      onClick={() => handleDeleteSentence(sentence)}
+                    >
+                      删除
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          </li>
+        ))}
+      </ul>
+    )
   }
 
   return (
@@ -256,128 +291,141 @@ export default function ManagePage({ onPractice }: Props) {
         </Button>
       </div>
 
-      {/* 文章表 */}
-      <div className="rounded-lg border bg-card">
-        <Table>
-          <TableHeader>
-            <TableRow className="hover:bg-transparent">
-              <TableHead className="w-10" aria-hidden />
-              <TableHead>文章标题</TableHead>
-              <TableHead className="w-[340px]">操作</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {articlesLoading ? (
-              [0, 1, 2].map(i => (
-                <TableRow key={`skel-${i}`} className="hover:bg-transparent">
-                  <TableCell />
-                  <TableCell><Skeleton className="h-4 w-2/5" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-3/5" /></TableCell>
-                </TableRow>
-              ))
-            ) : articles.length === 0 ? (
-              <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={3} className="py-10 text-center text-sm text-muted-foreground">
-                  暂无文章，点击「新建文章」开始
-                </TableCell>
-              </TableRow>
-            ) : (
-              articles.map(record => {
-                const expanded = expandedRowKeys.includes(record.id)
-                return (
-                  <FragmentRow key={record.id}>
-                    <TableRow>
-                      <TableCell>
+      {/* 文章卡片列表 */}
+      {articlesLoading ? (
+        <div className="space-y-3">
+          {[0, 1, 2].map(i => (
+            <Card key={`skel-${i}`} className="px-4 py-3.5">
+              <div className="flex items-center gap-3">
+                <Skeleton className="size-4 rounded" />
+                <Skeleton className="h-4 w-2/5" />
+                <Skeleton className="ml-auto h-7 w-28 rounded-md" />
+              </div>
+            </Card>
+          ))}
+        </div>
+      ) : articles.length === 0 ? (
+        <Card>
+          <div className="py-14 text-center text-sm text-muted-foreground">
+            暂无文章，点击「新建文章」开始
+          </div>
+        </Card>
+      ) : (
+        <div className="space-y-8">
+          {groupByMonth(articles).map(group => (
+            <section key={group.label} className="space-y-3">
+              <div className="flex items-baseline gap-2 px-1">
+                <h2 className="text-sm font-semibold">{group.label}</h2>
+                <span className="text-xs text-muted-foreground">{group.items.length} 篇</span>
+              </div>
+              <div className="space-y-3">
+                {group.items.map(record => {
+                  const expanded = expandedRowKeys.includes(record.id)
+                  return (
+                    <Card key={record.id} className="overflow-hidden py-0">
+                {/* 文章头：点击标题区展开/收起 */}
+                <div className="flex items-center gap-2 px-4 py-3">
+                  <button
+                    type="button"
+                    onClick={() => handleExpand(!expanded, record)}
+                    aria-expanded={expanded}
+                    className="flex min-w-0 flex-1 items-center gap-2 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                  >
+                    <span className="shrink-0 text-muted-foreground">
+                      {expanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+                    </span>
+                    <span className="truncate font-medium">{record.title}</span>
+                    <span className="ml-1 hidden shrink-0 text-xs text-muted-foreground tabular-nums sm:inline">
+                      {formatDate(record.createdAt)}
+                    </span>
+                  </button>
+                  <div className="inline-flex shrink-0 gap-1">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
                         <Button
                           variant="ghost"
                           size="icon-sm"
-                          aria-label={expanded ? '收起' : '展开'}
-                          onClick={() => handleExpand(!expanded, record)}
+                          className="text-primary"
+                          aria-label="练习"
+                          onClick={() => onPractice(record.id)}
                         >
-                          {expanded ? <ChevronDown /> : <ChevronRight />}
+                          <ListChecks />
                         </Button>
-                      </TableCell>
-                      <TableCell className="font-medium">{record.title}</TableCell>
-                      <TableCell>
-                        <div className="inline-flex flex-wrap gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-primary"
-                            onClick={() => onPractice(record.id)}
+                      </TooltipTrigger>
+                      <TooltipContent>练习</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label="新建句子"
+                          onClick={() => { setEditing(null); setNextArticleId(record.id); setModalKey(k => k + 1); setModalOpen(true) }}
+                        >
+                          <FilePlus2 />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>新建句子</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label="批量上传"
+                          onClick={() => { setBatchArticleId(record.id); setBatchOpen(true) }}
+                        >
+                          <Upload />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>批量上传</TooltipContent>
+                    </Tooltip>
+                    <AlertDialog>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon-sm" className="text-destructive" aria-label="删除">
+                              <Trash2 />
+                            </Button>
+                          </AlertDialogTrigger>
+                        </TooltipTrigger>
+                        <TooltipContent>删除</TooltipContent>
+                      </Tooltip>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>确认删除「{record.title}」？</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            删除文章后，其下句子也将一并移除，此操作不可撤销。
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>取消</AlertDialogCancel>
+                          <AlertDialogAction
+                            variant="destructive"
+                            onClick={() => handleDeleteArticle(record)}
                           >
-                            <ListChecks />
-                            练习
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => { setEditing(null); setNextArticleId(record.id); setModalKey(k => k + 1); setModalOpen(true) }}
-                          >
-                            新建句子
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => { setBatchArticleId(record.id); setBatchOpen(true) }}
-                          >
-                            <Upload />
-                            批量上传
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="sm" className="text-destructive">删除</Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>确认删除「{record.title}」？</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  删除文章后，其下句子也将一并移除，此操作不可撤销。
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>取消</AlertDialogCancel>
-                                <AlertDialogAction
-                                  variant="destructive"
-                                  onClick={() => handleDeleteArticle(record)}
-                                >
-                                  删除
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                    {expanded && (
-                      <TableRow className="hover:bg-transparent">
-                        <TableCell colSpan={3} className="bg-muted/30 p-0">
-                          <div className="px-3 py-2">
-                            <div className="rounded-lg border bg-card">
-                              <Table>
-                                <TableHeader>
-                                  <TableRow className="hover:bg-transparent">
-                                    <TableHead>句子内容</TableHead>
-                                    <TableHead className="w-[220px]">中文翻译</TableHead>
-                                    <TableHead className="w-[100px]">操作</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {renderSentenceRows(record.id)}
-                                </TableBody>
-                              </Table>
-                            </div>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </FragmentRow>
-                )
-              })
-            )}
-          </TableBody>
-        </Table>
-      </div>
+                            删除
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </div>
+
+                {/* 展开：句子列表 */}
+                {expanded && (
+                  <div className="border-t bg-muted/20 px-4 py-3">
+                    {renderSentenceList(record.id)}
+                  </div>
+                )}
+                    </Card>
+                  )
+                })}
+              </div>
+            </section>
+          ))}
+        </div>
+      )}
 
       <BatchUploadModal
         open={batchOpen}
@@ -434,9 +482,4 @@ export default function ManagePage({ onPractice }: Props) {
       />
     </>
   )
-}
-
-// 让一个 article 行 + 其展开行作为一组（React.Fragment 透传 key）
-function FragmentRow({ children }: { children: React.ReactNode }) {
-  return <>{children}</>
 }

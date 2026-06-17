@@ -7,8 +7,9 @@
 
 /* ============================================================
    WordBread — shadcn/ui (radix-nova) + Tailwind v4
-   主题锁定：亮色。品牌强调色锁定：amber-700（蜂蜜/面包暖金），
-   映射到 shadcn 的 --primary / --ring。圆角 0.625rem。
+   主题锁定：亮色。品牌强调色：靛蓝 Indigo（色相 ~270），
+   映射到 shadcn 的 --primary / --ring / --accent。圆角 0.625rem。
+   换主题色只需改本文件的 --primary/--accent 等 token（亮+暗两套）。
    ============================================================ */
 
 :root {
@@ -22,23 +23,23 @@
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.21 0.01 60);
 
-  /* 品牌琥珀 amber-700 */
-  --primary: oklch(0.555 0.163 49);
-  --primary-foreground: oklch(0.985 0.01 80);
+  /* 品牌靛蓝 Indigo */
+  --primary: oklch(0.515 0.194 270);
+  --primary-foreground: oklch(0.985 0.012 270);
 
   --secondary: oklch(0.97 0.006 75);
   --secondary-foreground: oklch(0.28 0.01 60);
   --muted: oklch(0.97 0.006 75);
   --muted-foreground: oklch(0.55 0.01 60);
 
-  /* 浅琥珀 accent（高亮/hover） */
-  --accent: oklch(0.96 0.03 80);
-  --accent-foreground: oklch(0.42 0.11 55);
+  /* 浅靛蓝 accent（高亮/hover） */
+  --accent: oklch(0.962 0.022 270);
+  --accent-foreground: oklch(0.45 0.14 270);
 
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.92 0.006 75);
   --input: oklch(0.92 0.006 75);
-  --ring: oklch(0.555 0.163 49);
+  --ring: oklch(0.515 0.194 270);
 
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
@@ -48,12 +49,12 @@
 
   --sidebar: oklch(0.985 0.004 75);
   --sidebar-foreground: oklch(0.21 0.01 60);
-  --sidebar-primary: oklch(0.555 0.163 49);
-  --sidebar-primary-foreground: oklch(0.985 0.01 80);
-  --sidebar-accent: oklch(0.96 0.03 80);
-  --sidebar-accent-foreground: oklch(0.42 0.11 55);
+  --sidebar-primary: oklch(0.515 0.194 270);
+  --sidebar-primary-foreground: oklch(0.985 0.012 270);
+  --sidebar-accent: oklch(0.962 0.022 270);
+  --sidebar-accent-foreground: oklch(0.45 0.14 270);
   --sidebar-border: oklch(0.92 0.006 75);
-  --sidebar-ring: oklch(0.555 0.163 49);
+  --sidebar-ring: oklch(0.515 0.194 270);
 
   color-scheme: light;
 }
@@ -108,18 +109,18 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.646 0.18 50);
-  --primary-foreground: oklch(0.21 0.02 60);
+  --primary: oklch(0.62 0.18 270);
+  --primary-foreground: oklch(0.22 0.03 270);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
   --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.32 0.04 60);
-  --accent-foreground: oklch(0.95 0.02 80);
+  --accent: oklch(0.34 0.05 270);
+  --accent-foreground: oklch(0.95 0.02 270);
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.646 0.18 50);
+  --ring: oklch(0.62 0.18 270);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -127,12 +128,12 @@
   --chart-5: oklch(0.769 0.188 70.08);
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.646 0.18 50);
+  --sidebar-primary: oklch(0.62 0.18 270);
   --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(0.269 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.646 0.18 50);
+  --sidebar-ring: oklch(0.62 0.18 270);
 }
 
 @layer base {
