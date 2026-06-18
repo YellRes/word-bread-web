@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "WordBread 高亮",
+  "version": "1.0.0",
+  "description": "把你在 WordBread 记录的重点词在任意网页中高亮标出，点击查看中文释义。",
+  "permissions": ["storage", "alarms"],
+  "host_permissions": ["https://nytnkcapnevndqvsftaz.supabase.co/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "WordBread 高亮"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "css": ["content.css"],
+      "js": ["config.js", "lib/annotation.js", "content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

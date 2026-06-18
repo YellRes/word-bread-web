@@ -1,0 +1,46 @@
+/* 高亮标记：浅靛蓝底 + 靛蓝下划线，呼应网页端品牌色 */
+mark.wb-hl {
+  background-color: rgba(79, 70, 229, 0.12);
+  border-bottom: 2px solid #4f46e5;
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+  cursor: pointer;
+  /* 防止被宿主页覆盖 */
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+mark.wb-hl:hover {
+  background-color: rgba(79, 70, 229, 0.2);
+}
+
+/* 点击释义浮层 */
+.wb-popover {
+  position: absolute;
+  z-index: 2147483647;
+  max-width: 280px;
+  background: #ffffff;
+  color: #1f2230;
+  border: 1px solid rgba(79, 70, 229, 0.25);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(31, 34, 48, 0.18);
+  padding: 10px 12px;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  pointer-events: auto;
+}
+.wb-popover-word {
+  font-weight: 600;
+  color: #4f46e5;
+  margin-bottom: 2px;
+  word-break: break-word;
+}
+.wb-popover-hint {
+  color: #4b4f60;
+  word-break: break-word;
+}
+.wb-popover-empty {
+  color: #8a8f9c;
+  font-style: italic;
+}
