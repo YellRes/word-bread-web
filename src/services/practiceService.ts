@@ -1,4 +1,5 @@
 import { supabase } from '../utils/supabase'
+import { normalizeAnswer } from '../lib/annotation'
 
 export interface PracticeRecordInput {
   sentenceId: string
@@ -17,6 +18,34 @@ export const recordPractice = async (input: PracticeRecordInput): Promise<boolea
 
   if (error) {
     console.error('Error recording practice:', error)
+    return false
+  }
+  return true
+}
+
+export interface BlankAttemptInput {
+  sentenceId: string
+  articleId: string
+  blanks: { word: string; hint: string }[]
+  firstResults: boolean[]
+  revealed: boolean
+}
+
+/** 按"首次作答"逐空写入 BlankAttempt（词级易错统计来源）。失败仅记录日志，不阻断练习。 */
+export const recordBlankAttempts = async (input: BlankAttemptInput): Promise<boolean> => {
+  if (input.blanks.length === 0) return true
+  const rows = input.blanks.map((b, i) => ({
+    id: crypto.randomUUID(),
+    sentenceId: input.sentenceId,
+    articleId: input.articleId,
+    word: normalizeAnswer(b.word),
+    hint: b.hint,
+    isCorrect: input.firstResults[i] ?? false,
+    revealed: input.revealed,
+  }))
+  const { error } = await supabase.from('BlankAttempt').insert(rows)
+  if (error) {
+    console.error('Error recording blank attempts:', error)
     return false
   }
   return true

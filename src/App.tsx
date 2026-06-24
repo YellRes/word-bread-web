@@ -5,9 +5,10 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import ManagePage from './pages/ManagePage'
 import PracticePage from './pages/PracticePage'
 import WrongPage from './pages/WrongPage'
+import StatsPage from './pages/StatsPage'
 import type { DBSentence } from './types/index'
 
-type View = 'manage' | 'practice' | 'wrong'
+type View = 'manage' | 'practice' | 'wrong' | 'stats'
 
 export default function App() {
   const [view, setView] = useState<View>('manage')
@@ -53,6 +54,7 @@ export default function App() {
           <TabsTrigger value="manage">句子库</TabsTrigger>
           <TabsTrigger value="practice">练习</TabsTrigger>
           <TabsTrigger value="wrong">错题本</TabsTrigger>
+          <TabsTrigger value="stats">数据</TabsTrigger>
         </TabsList>
         <TabsContent value="manage">
           <ManagePage onPractice={startArticlePractice} />
@@ -67,6 +69,9 @@ export default function App() {
         </TabsContent>
         <TabsContent value="wrong">
           <WrongPage onPractice={startCustomPractice} />
+        </TabsContent>
+        <TabsContent value="stats">
+          <StatsPage onPractice={startCustomPractice} />
         </TabsContent>
       </Tabs>
     </div>

@@ -33,8 +33,37 @@ function extractAnnotations(content) {
   return out
 }
 
+function wbEscapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/** 用 wordMap 的键构建匹配正则：长短语优先、空白放宽、词边界。 */
+function wbBuildWordRegex(wordMap) {
+  var keys = Object.keys(wordMap || {})
+  if (keys.length === 0) return null
+  keys.sort(function (a, b) { return b.length - a.length })
+  var alts = keys.map(function (k) { return wbEscapeRegExp(k).replace(/\s+/g, '\\s+') })
+  return new RegExp('\\b(?:' + alts.join('|') + ')\\b', 'gi')
+}
+
+/**
+ * 把纯文本里"词库已有的词"自动包裹成 (原词-中文)。未命中的文本原样保留。
+ * wordMap[norm] = { display, hint }，norm 为小写压空格的键（与 background 一致）。
+ */
+function buildAnnotatedContent(text, wordMap) {
+  var re = wbBuildWordRegex(wordMap)
+  if (!re) return text
+  return text.replace(re, function (m) {
+    var norm = m.toLowerCase().replace(/\s+/g, ' ')
+    var entry = wordMap[norm]
+    var hint = entry && entry.hint ? entry.hint : ''
+    return '(' + m + (hint ? ('-' + hint) : '') + ')'
+  })
+}
+
 // 暴露给 service worker / content script 全局
 if (typeof self !== 'undefined') {
   self.extractAnnotations = extractAnnotations
   self.wbSplitAnnotation = wbSplitAnnotation
+  self.buildAnnotatedContent = buildAnnotatedContent
 }
