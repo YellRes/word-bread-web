@@ -148,7 +148,15 @@ export default function PracticePage({ initialArticleId, customSentences, custom
     setBlankResults(results)
     setWordShown(blanks.map(() => true))
     setChecked(true)
-    if (allCorrect) setCorrectCount(c => c + 1)
+    if (allCorrect) {
+      setCorrectCount(c => c + 1)
+      const isLast = index >= sentences.length - 1
+      toast.success(isLast ? '全部答对！查看结果' : '全部答对！进入下一题')
+      // 全对后短暂停留让用户看到绿色反馈，再自动进入下一题
+      window.setTimeout(() => handleNext(), 900)
+    } else {
+      toast.error(`还有 ${blanks.length - correctBlanks} 个填错了，看看正确答案`)
+    }
     persist(allCorrect, correctBlanks, false)
   }
 
@@ -350,7 +358,7 @@ export default function PracticePage({ initialArticleId, customSentences, custom
                       variant="ghost"
                       size="icon-sm"
                       className="size-7 shrink-0 text-muted-foreground hover:text-primary"
-                      onClick={() => speak(b.answer)}
+                      onClick={() => speak(b.answer, 0.7)}
                       aria-label="播放单词读音"
                       title="播放单词读音"
                     >
