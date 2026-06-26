@@ -146,4 +146,25 @@
   html {
     @apply font-sans;
   }
+
+  /* 仪表盘卡片入场：轻量上浮淡入（配合 inline animation-delay 做交错） */
+  .anim-rise {
+    animation: anim-rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  @keyframes anim-rise {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* a11y：尊重系统「减少动态效果」偏好，关闭所有入场动画/过渡 */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }

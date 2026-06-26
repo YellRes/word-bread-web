@@ -306,8 +306,14 @@ export default function ManagePage({ onPractice }: Props) {
         </div>
       ) : articles.length === 0 ? (
         <Card>
-          <div className="py-14 text-center text-sm text-muted-foreground">
-            暂无文章，点击「新建文章」开始
+          <div className="flex flex-col items-center gap-2 py-16 text-center">
+            <div className="grid size-12 place-items-center rounded-full bg-primary/10 text-primary">
+              <FilePlus2 className="size-6" />
+            </div>
+            <p className="text-base font-medium">还没有文章</p>
+            <p className="text-sm text-muted-foreground">
+              点击「新建文章」开始，再往里面添加要练习的句子。
+            </p>
           </div>
         </Card>
       ) : (

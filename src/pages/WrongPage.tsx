@@ -59,7 +59,7 @@ function ReviewRow({ it, onPractice }: { it: ReviewItem; onPractice: Props['onPr
             variant="outline"
             className={cn(
               'gap-1',
-              it.due ? 'border-destructive/30 text-destructive' : 'text-muted-foreground'
+              it.due ? 'border-amber-500/40 text-amber-600' : 'text-muted-foreground'
             )}
           >
             <CalendarClock className="size-3" />
@@ -170,9 +170,9 @@ export default function WrongPage({ onPractice }: Props) {
       {/* 工具栏：今日待复习 + 开始复习 + 文章筛选 */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="mr-auto flex items-center gap-2 text-sm">
-          <AlarmClock className={cn('size-4', dueItems.length ? 'text-destructive' : 'text-muted-foreground')} />
+          <AlarmClock className={cn('size-4', dueItems.length ? 'text-amber-500' : 'text-muted-foreground')} />
           今日待复习
-          <span className={cn('font-semibold', dueItems.length ? 'text-destructive' : 'text-foreground')}>
+          <span className={cn('font-semibold tabular-nums', dueItems.length ? 'text-amber-600' : 'text-foreground')}>
             {dueItems.length}
           </span>
           <span className="text-muted-foreground">/ 共 {filtered.length}</span>
@@ -219,8 +219,8 @@ export default function WrongPage({ onPractice }: Props) {
 
       {/* 今日待复习 */}
       {dueItems.length > 0 && (
-        <section className="space-y-3">
-          <h3 className="text-sm font-semibold text-destructive">今日待复习</h3>
+        <section className="anim-rise space-y-3">
+          <h3 className="text-sm font-semibold text-amber-600">今日待复习</h3>
           <ul className="space-y-3">
             {dueItems.map(it => (
               <li key={it.sentence.id}>
@@ -233,7 +233,7 @@ export default function WrongPage({ onPractice }: Props) {
 
       {/* 复习中（未到期） */}
       {pendingItems.length > 0 && (
-        <section className="space-y-3">
+        <section className="anim-rise space-y-3" style={{ animationDelay: '80ms' }}>
           <h3 className="text-sm font-semibold text-muted-foreground">
             复习中 · 已安排
           </h3>

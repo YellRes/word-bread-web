@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { Check, X, ChevronsUpDown, RotateCcw, ListChecks, Volume2, Eye, EyeOff } from 'lucide-react'
+import { Check, X, ChevronsUpDown, RotateCcw, ListChecks, Volume2, Eye, EyeOff, Trophy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
@@ -340,17 +340,25 @@ export default function PracticePage({ initialArticleId, customSentences, custom
   // ---- summary ----
   if (phase === 'summary') {
     const total = sentences.length
+    const pct = total ? Math.round((correctCount / total) * 100) : 0
     return (
       <div className="mx-auto max-w-xl">
-        <Card>
+        <Card className="anim-rise">
           <CardHeader>
-            <div className="text-lg font-semibold">练习完成 🎉</div>
+            <div className="flex items-center gap-2 text-lg font-semibold">
+              <span className="grid size-8 place-items-center rounded-lg bg-primary/10 text-primary">
+                <Trophy className="size-5" />
+              </span>
+              练习完成
+            </div>
             <p className="text-sm text-muted-foreground">{headerTitle}</p>
           </CardHeader>
           <CardContent>
-            <div className="rounded-lg border bg-muted/30 py-8 text-center">
-              <div className="text-4xl font-bold text-primary">{correctCount}/{total}</div>
-              <p className="mt-1 text-sm text-muted-foreground">句完全答对</p>
+            <div className="rounded-xl border bg-muted/30 py-8 text-center">
+              <div className="text-4xl font-bold tabular-nums text-primary">
+                {correctCount}<span className="text-2xl text-muted-foreground">/{total}</span>
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">句完全答对 · 正确率 {pct}%</p>
             </div>
           </CardContent>
           <CardFooter className="gap-2">
