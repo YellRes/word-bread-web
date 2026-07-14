@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { Check, X, ChevronsUpDown, RotateCcw, ListChecks, Volume2, Eye, EyeOff, Trophy } from 'lucide-react'
+import { Check, X, ChevronsUpDown, RotateCcw, ListChecks, Volume2, Eye, EyeOff, Trophy, Gauge } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/command'
 import { cn } from '@/lib/utils'
 import { parseContent, hasBlanks, normalizeAnswer, toPlainSentence } from '@/lib/annotation'
-import { speak } from '@/lib/speech'
+import { speak, SPEECH_RATES, getSpeechRate, setSpeechRate } from '@/lib/speech'
 import { fetchArticles } from '../services/articleService'
 import { fetchSentences } from '../services/sentenceService'
 import { recordPractice, recordBlankAttempts } from '../services/practiceService'
@@ -60,12 +60,23 @@ export default function PracticePage({ initialArticleId, customSentences, custom
   const [revealed, setRevealed] = useState(false)
   const [blankResults, setBlankResults] = useState<boolean[]>([])
   const [wordShown, setWordShown] = useState<boolean[]>([])
+  const [peeked, setPeeked] = useState<boolean[]>([]) // 首检前点开"生词"看过答案的空 → 该空按答错计
   const [correctCount, setCorrectCount] = useState(0)
   const [sessionTitle, setSessionTitle] = useState('')
 
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
   const advanceTimer = useRef<number | null>(null)
   const checked = stage === 'done' // 兼容旧渲染判定：done 即"已检查/已锁定"
+
+  // 朗读语速（整句 + 单词共用）；持久化到 localStorage，切换后即时试听当前句
+  const [rate, setRate] = useState(getSpeechRate)
+  const [speedOpen, setSpeedOpen] = useState(false)
+  const changeRate = (v: number) => {
+    setRate(v)
+    setSpeechRate(v)
+    setSpeedOpen(false)
+    if (current) speak(toPlainSentence(current.content), v) // 立刻试听新语速
+  }
 
   useEffect(() => { fetchArticles().then(setArticles) }, [])
 
@@ -88,11 +99,14 @@ export default function PracticePage({ initialArticleId, customSentences, custom
     setRevealed(false)
     setBlankResults([])
     setWordShown(Array(blanks.length).fill(false))
+    setPeeked(Array(blanks.length).fill(false))
     // 清理上一句可能挂着的自动跳题计时器
     if (advanceTimer.current !== null) {
       clearTimeout(advanceTimer.current)
       advanceTimer.current = null
     }
+    // 进入本句时自动朗读一遍整句（跟随当前语速设置）
+    if (current) speak(toPlainSentence(current.content))
     // 渲染后聚焦第一个空（延后到挂载/夺焦修正之后，跳题更稳）
     const id = window.setTimeout(() => inputRefs.current[0]?.focus(), 50)
     return () => clearTimeout(id)
@@ -197,6 +211,7 @@ export default function PracticePage({ initialArticleId, customSentences, custom
   const handleBlankInput = (k: number, val: string, answer: string) => {
     setInputs(prev => prev.map((v, idx) => (idx === k ? val : v)))
     if (stage === 'done') return
+    if (peeked[k]) return // 看过答案的空：照常记录输入，但不判绿、不锁定、不参与全对
     if (normalizeAnswer(val) !== normalizeAnswer(answer)) return
     const base = solved.length === blanks.length ? solved : blanks.map(() => false)
     const nextSolved = base.map((v, idx) => (idx === k ? true : v))
@@ -214,7 +229,7 @@ export default function PracticePage({ initialArticleId, customSentences, custom
   }
 
   const handleCheck = () => {
-    const results = blanks.map((b, k) => normalizeAnswer(inputs[k] ?? '') === normalizeAnswer(b.answer))
+    const results = blanks.map((b, k) => normalizeAnswer(inputs[k] ?? '') === normalizeAnswer(b.answer) && !peeked[k])
     if (results.every(Boolean)) { setSolved(results); finishAllCorrect(); return }
     setFirstResults(results)
     setBlankResults(results)
@@ -232,8 +247,8 @@ export default function PracticePage({ initialArticleId, customSentences, custom
   }
 
   const handleRetryCheck = () => {
-    // 重试不再落库；揭示完整答案并标记
-    const results = blanks.map((b, k) => normalizeAnswer(inputs[k] ?? '') === normalizeAnswer(b.answer))
+    // 重试不再落库；揭示完整答案并标记（看过生词的空仍按答错显示）
+    const results = blanks.map((b, k) => normalizeAnswer(inputs[k] ?? '') === normalizeAnswer(b.answer) && !peeked[k])
     setBlankResults(results)
     setWordShown(blanks.map(() => true))
     setStage('done')
@@ -241,7 +256,7 @@ export default function PracticePage({ initialArticleId, customSentences, custom
 
   const handleReveal = () => {
     // 在覆盖输入前先算每个空的对错（用于复盘），显示答案整句计为未掌握
-    const results = blanks.map((b, k) => normalizeAnswer(inputs[k] ?? '') === normalizeAnswer(b.answer))
+    const results = blanks.map((b, k) => normalizeAnswer(inputs[k] ?? '') === normalizeAnswer(b.answer) && !peeked[k])
     setBlankResults(results)
     setWordShown(blanks.map(() => true))
     setInputs(blanks.map(b => b.answer))
@@ -260,8 +275,14 @@ export default function PracticePage({ initialArticleId, customSentences, custom
     else handleNext()
   }
 
-  const toggleWord = (k: number) =>
+  const toggleWord = (k: number) => {
+    // 首检前点开生词 = 看了答案 → 该空按答错计（一次性，隐藏后再看仍算）
+    if (stage === 'first' && !wordShown[k] && !peeked[k]) {
+      setPeeked(prev => prev.map((v, i) => (i === k ? true : v)))
+      toast.info('看了生词，这个空按答错计')
+    }
     setWordShown(prev => prev.map((v, i) => (i === k ? !v : v)))
+  }
 
   const handleNext = () => {
     if (advanceTimer.current !== null) { clearTimeout(advanceTimer.current); advanceTimer.current = null }
@@ -396,13 +417,44 @@ export default function PracticePage({ initialArticleId, customSentences, custom
 
       <Card className="shadow-sm">
         <CardContent className="px-6 py-7 sm:px-8">
-          {/* 朗读按钮 */}
-          <div className="mb-1 flex justify-end">
+          {/* 朗读控件：调速 + 播放整句 */}
+          <div className="mb-1 flex items-center justify-end gap-0.5">
+            <Popover open={speedOpen} onOpenChange={setSpeedOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="gap-1 px-2 text-muted-foreground hover:text-primary"
+                  aria-label="调节朗读语速"
+                  title="调节朗读语速"
+                >
+                  <Gauge className="size-4" />
+                  <span className="tabular-nums">{rate}×</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-32 p-1">
+                <div className="px-2 py-1 text-xs text-muted-foreground">朗读语速</div>
+                {SPEECH_RATES.map(r => (
+                  <button
+                    key={r.value}
+                    type="button"
+                    onClick={() => changeRate(r.value)}
+                    className={cn(
+                      'flex w-full items-center justify-between rounded-md px-2 py-1.5 text-sm hover:bg-muted',
+                      r.value === rate && 'bg-muted font-medium text-primary'
+                    )}
+                  >
+                    <span>{r.label}</span>
+                    {r.value === rate && <Check className="size-3.5" />}
+                  </button>
+                ))}
+              </PopoverContent>
+            </Popover>
             <Button
               variant="ghost"
               size="icon-sm"
               className="text-muted-foreground hover:text-primary"
-              onClick={() => speak(toPlainSentence(current.content))}
+              onClick={() => speak(toPlainSentence(current.content), rate)}
               aria-label="播放整句读音"
               title="播放整句读音"
             >
@@ -468,7 +520,7 @@ export default function PracticePage({ initialArticleId, customSentences, custom
                       variant="ghost"
                       size="icon-sm"
                       className="size-7 shrink-0 text-muted-foreground hover:text-primary"
-                      onClick={() => speak(b.answer, 0.7)}
+                      onClick={() => speak(b.answer, rate)}
                       aria-label="播放单词读音"
                       title="播放单词读音"
                     >
